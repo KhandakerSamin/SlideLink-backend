@@ -9,6 +9,8 @@ const {
   getDashboardStats,
   getRecentCollections, // Make sure this is imported!
 } = require("../controllers/collectionController")
+const { updateSubmission, deleteSubmission } = require("../controllers/collectionController")
+
 const router = express.Router()
 
 // POST /api/collections - Create a new collection
@@ -16,6 +18,9 @@ router.post("/collections", createCollection)
 
 // POST /api/collections/join - Authenticate to access a collection
 router.post("/collections/join", joinCollection)
+
+// NEW: GET /api/collections/recent - Get recent collections for homepage display
+router.get("/collections/recent", getRecentCollections) // This line is crucial!
 
 // GET /api/collections/:username - Get a specific collection by username (without password check here)
 router.get("/collections/:username", getCollectionByUsername)
@@ -32,7 +37,10 @@ router.delete("/collections/:username", deleteCollection)
 // GET /api/dashboard-stats - Get overall platform statistics
 router.get("/dashboard-stats", getDashboardStats)
 
-// NEW: GET /api/collections/recent - Get recent collections for homepage display
-router.get("/collections/recent", getRecentCollections) // This line is crucial!
+router.post("/collections/:username/submissions", submitSlideLink)
+router.put("/collections/:username/submissions/:submissionId", updateSubmission)
+router.delete("/collections/:username/submissions/:submissionId", deleteSubmission)
+
+
 
 module.exports = router

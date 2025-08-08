@@ -122,38 +122,136 @@ const getSubmissions = async (req, res) => {
 
 const submitSlideLink = async (req, res) => {
   const { username } = req.params
-  const { teamName, slideLink, leaderEmail } = req.body
+  const { teamName, teamSerial, slideLink, leaderEmail } = req.body
+
   const db = getDb()
   if (!db) {
     return res.status(500).json({ error: "Database not connected" })
   }
-  if (!teamName || !slideLink) {
-    return res.status(400).json({ error: "Team Name and Slide Link are required" })
+
+  // Validation: teamSerial and slideLink must be provided
+  if (!teamSerial || !slideLink) {
+    return res.status(400).json({ error: "Team Serial and Slide Link are required" })
   }
+
   try {
-    // Find the collection to ensure it exists
+    // Find the collection
     const collection = await db.collection("collections").findOne({ username })
     if (!collection) {
       return res.status(404).json({ error: "Collection not found" })
     }
+
+    // Check if this teamSerial already exists
+    const duplicate = collection.submissions.find(s => s.teamSerial === teamSerial)
+    if (duplicate) {
+      return res.status(409).json({ error: "A submission with this Team Serial already exists" })
+    }
+
+    // Create new submission
     const newSubmission = {
-      _id: new ObjectId(), // Generate a unique ID for the submission
-      teamName,
+      _id: new ObjectId(),
+      teamName: teamName || null,
+      teamSerial,
       slideLink,
       leaderEmail: leaderEmail || null,
       submittedAt: new Date(),
     }
-    const result = await db.collection("collections").updateOne({ username }, { $push: { submissions: newSubmission } })
+
+    // Insert and keep submissions sorted by teamSerial
+    const updatedSubmissions = [...(collection.submissions || []), newSubmission]
+      .sort((a, b) => a.teamSerial - b.teamSerial)
+
+    const result = await db.collection("collections").updateOne(
+      { username },
+      { $set: { submissions: updatedSubmissions } }
+    )
+
     if (result.modifiedCount === 1) {
       res.status(201).json({ message: "Slide link submitted successfully", submission: newSubmission })
     } else {
-      res.status(500).json({ error: "Failed to add slide link to collection" })
+      res.status(500).json({ error: "Failed to add slide link" })
     }
   } catch (error) {
     console.error("Error submitting slide link:", error)
     res.status(500).json({ error: "Internal server error" })
   }
 }
+
+const updateSubmission = async (req, res) => {
+  const { username, submissionId } = req.params
+  const { teamSerial, slideLink, teamName } = req.body
+
+  const db = getDb()
+  if (!db) {
+    return res.status(500).json({ error: "Database not connected" })
+  }
+
+  if (!teamSerial || !slideLink) {
+    return res.status(400).json({ error: "Team Serial and Slide Link are required" })
+  }
+
+  try {
+    const collection = await db.collection("collections").findOne({ username })
+    if (!collection) {
+      return res.status(404).json({ error: "Collection not found" })
+    }
+
+    // Check duplicate teamSerial (excluding current submission)
+    const duplicate = collection.submissions.find(
+      s => s.teamSerial === teamSerial && s._id.toString() !== submissionId
+    )
+    if (duplicate) {
+      return res.status(409).json({ error: "A submission with this Team Serial already exists" })
+    }
+
+    const updatedSubmissions = collection.submissions.map(s => 
+      s._id.toString() === submissionId
+        ? { ...s, teamSerial, slideLink, teamName: teamName || null }
+        : s
+    ).sort((a, b) => a.teamSerial - b.teamSerial)
+
+    const result = await db.collection("collections").updateOne(
+      { username },
+      { $set: { submissions: updatedSubmissions } }
+    )
+
+    if (result.modifiedCount === 1) {
+      res.status(200).json({ message: "Submission updated successfully" })
+    } else {
+      res.status(500).json({ error: "Failed to update submission" })
+    }
+  } catch (error) {
+    console.error("Error updating submission:", error)
+    res.status(500).json({ error: "Internal server error" })
+  }
+}
+
+const deleteSubmission = async (req, res) => {
+  const { username, submissionId } = req.params
+  const db = getDb()
+  if (!db) {
+    return res.status(500).json({ error: "Database not connected" })
+  }
+
+  try {
+    const result = await db.collection("collections").updateOne(
+      { username },
+      { $pull: { submissions: { _id: new ObjectId(submissionId) } } }
+    )
+
+    if (result.modifiedCount === 1) {
+      res.status(200).json({ message: "Submission deleted successfully" })
+    } else {
+      res.status(404).json({ error: "Submission not found" })
+    }
+  } catch (error) {
+    console.error("Error deleting submission:", error)
+    res.status(500).json({ error: "Internal server error" })
+  }
+}
+
+
+
 
 const deleteCollection = async (req, res) => {
   const { username } = req.params
@@ -239,6 +337,8 @@ module.exports = {
   getSubmissions,
   submitSlideLink,
   deleteCollection,
-  getDashboardStats, // Export new function
-  getRecentCollections, // Export new function
+  getDashboardStats,
+  getRecentCollections,
+  updateSubmission,
+  deleteSubmission
 }

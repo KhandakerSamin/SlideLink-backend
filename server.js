@@ -26,5 +26,5 @@ connectDB((err) => {
 
 // Basic route for testing
 app.get("/", (req, res) => {
-  res.send("Collection Backend API is running!")
+  res.send("SlideLink Backend is running!")
 })
