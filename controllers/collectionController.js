@@ -159,7 +159,7 @@ const submitSlideLink = async (req, res) => {
 
     // Insert and keep submissions sorted by teamSerial
     const updatedSubmissions = [...(collection.submissions || []), newSubmission]
-      .sort((a, b) => a.teamSerial - b.teamSerial)
+      .sort((a, b) => Number(a.teamSerial) - Number(b.teamSerial))
 
     const result = await db.collection("collections").updateOne(
       { username },
@@ -180,8 +180,10 @@ const submitSlideLink = async (req, res) => {
 const updateSubmission = async (req, res) => {
   const { username, submissionId } = req.params
   const { teamSerial, slideLink, teamName } = req.body
-
   const db = getDb()
+
+  console.log("Update request:", { username, submissionId, body: req.body }) // Debug log
+
   if (!db) {
     return res.status(500).json({ error: "Database not connected" })
   }
@@ -190,30 +192,46 @@ const updateSubmission = async (req, res) => {
     return res.status(400).json({ error: "Team Serial and Slide Link are required" })
   }
 
+  // Validate ObjectId format
+  if (!ObjectId.isValid(submissionId)) {
+    return res.status(400).json({ error: "Invalid submission ID format" })
+  }
+
   try {
     const collection = await db.collection("collections").findOne({ username })
     if (!collection) {
       return res.status(404).json({ error: "Collection not found" })
     }
 
+    console.log("Found collection with submissions:", collection.submissions?.length || 0) // Debug log
+
+    // Check if submission exists
+    const submissionExists = collection.submissions.find((s) => s._id.toString() === submissionId)
+    if (!submissionExists) {
+      return res.status(404).json({ error: "Submission not found" })
+    }
+
     // Check duplicate teamSerial (excluding current submission)
     const duplicate = collection.submissions.find(
-      s => s.teamSerial === teamSerial && s._id.toString() !== submissionId
+      (s) => s.teamSerial === teamSerial && s._id.toString() !== submissionId,
     )
     if (duplicate) {
       return res.status(409).json({ error: "A submission with this Team Serial already exists" })
     }
 
-    const updatedSubmissions = collection.submissions.map(s => 
-      s._id.toString() === submissionId
-        ? { ...s, teamSerial, slideLink, teamName: teamName || null }
-        : s
-    ).sort((a, b) => a.teamSerial - b.teamSerial)
+    const updatedSubmissions = collection.submissions
+      .map((s) =>
+        s._id.toString() === submissionId
+          ? { ...s, teamSerial, slideLink, teamName: teamName || null, updatedAt: new Date() }
+          : s,
+      )
+      .sort((a, b) => Number(a.teamSerial) - Number(b.teamSerial))
 
-    const result = await db.collection("collections").updateOne(
-      { username },
-      { $set: { submissions: updatedSubmissions } }
-    )
+    const result = await db
+      .collection("collections")
+      .updateOne({ username }, { $set: { submissions: updatedSubmissions } })
+
+    console.log("Update result:", result) // Debug log
 
     if (result.modifiedCount === 1) {
       res.status(200).json({ message: "Submission updated successfully" })
@@ -226,31 +244,40 @@ const updateSubmission = async (req, res) => {
   }
 }
 
+
 const deleteSubmission = async (req, res) => {
   const { username, submissionId } = req.params
   const db = getDb()
+
+  console.log("Delete request:", { username, submissionId }) // Debug log
+
   if (!db) {
     return res.status(500).json({ error: "Database not connected" })
   }
 
+  // Validate ObjectId format
+  if (!ObjectId.isValid(submissionId)) {
+    return res.status(400).json({ error: "Invalid submission ID format" })
+  }
+
   try {
-    const result = await db.collection("collections").updateOne(
-      { username },
-      { $pull: { submissions: { _id: new ObjectId(submissionId) } } }
-    )
+    // Find the document with matching username in "collections" collection and pull the submission
+    const result = await db
+      .collection("collections")
+      .updateOne({ username: username }, { $pull: { submissions: { _id: new ObjectId(submissionId) } } })
+
+    console.log("Delete result:", result) // Debug log
 
     if (result.modifiedCount === 1) {
       res.status(200).json({ message: "Submission deleted successfully" })
     } else {
-      res.status(404).json({ error: "Submission not found" })
+      res.status(404).json({ error: "Submission not found or already deleted" })
     }
   } catch (error) {
     console.error("Error deleting submission:", error)
     res.status(500).json({ error: "Internal server error" })
   }
 }
-
-
 
 
 const deleteCollection = async (req, res) => {
