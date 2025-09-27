@@ -7,40 +7,45 @@ const {
   submitSlideLink,
   deleteCollection,
   getDashboardStats,
-  getRecentCollections, // Make sure this is imported!
+  getRecentCollections,
+  updateSubmission,
+  deleteSubmission
 } = require("../controllers/collectionController")
-const { updateSubmission, deleteSubmission } = require("../controllers/collectionController")
 
 const router = express.Router()
 
+// Dashboard and general routes (these should come first to avoid conflicts)
+// GET /api/dashboard-stats - Get overall platform statistics
+router.get("/dashboard-stats", getDashboardStats)
+
+// GET /api/collections/recent - Get recent collections for homepage display
+router.get("/collections/recent", getRecentCollections)
+
+// Collection management routes
 // POST /api/collections - Create a new collection
 router.post("/collections", createCollection)
 
 // POST /api/collections/join - Authenticate to access a collection
 router.post("/collections/join", joinCollection)
 
-// NEW: GET /api/collections/recent - Get recent collections for homepage display
-router.get("/collections/recent", getRecentCollections) // This line is crucial!
-
-// GET /api/collections/:username - Get a specific collection by username (without password check here)
+// Specific collection routes (username-based)
+// GET /api/collections/:username - Get a specific collection by username
 router.get("/collections/:username", getCollectionByUsername)
 
+// DELETE /api/collections/:username - Delete a collection
+router.delete("/collections/:username", deleteCollection)
+
+// Submission management routes for specific collections
 // GET /api/collections/:username/submissions - Get all team submissions for a collection
 router.get("/collections/:username/submissions", getSubmissions)
 
 // POST /api/collections/:username/submissions - Add a new team submission to a collection
 router.post("/collections/:username/submissions", submitSlideLink)
 
-// DELETE /api/collections/:username - Delete a collection
-router.delete("/collections/:username", deleteCollection)
-
-// GET /api/dashboard-stats - Get overall platform statistics
-router.get("/dashboard-stats", getDashboardStats)
-
-router.post("/collections/:username/submissions", submitSlideLink)
+// PUT /api/collections/:username/submissions/:submissionId - Update a specific submission
 router.put("/collections/:username/submissions/:submissionId", updateSubmission)
+
+// DELETE /api/collections/:username/submissions/:submissionId - Delete a specific submission
 router.delete("/collections/:username/submissions/:submissionId", deleteSubmission)
-
-
 
 module.exports = router
