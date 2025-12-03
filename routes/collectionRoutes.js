@@ -18,15 +18,15 @@ const router = express.Router()
 // GET /api/dashboard-stats - Get overall platform statistics
 router.get("/dashboard-stats", getDashboardStats)
 
-// GET /api/collections/recent - Get recent collections for homepage display
-router.get("/collections/recent", getRecentCollections)
-
 // Collection management routes
 // POST /api/collections - Create a new collection
 router.post("/collections", createCollection)
 
 // POST /api/collections/join - Authenticate to access a collection
 router.post("/collections/join", joinCollection)
+
+// GET /api/collections/recent - Get recent collections for homepage display (must be before :username)
+router.get("/collections/recent", getRecentCollections)
 
 // Specific collection routes (username-based)
 // GET /api/collections/:username - Get a specific collection by username
